@@ -157,6 +157,16 @@ export class PdfHighlighter<T_HT extends IHighlight> extends PureComponent<
       this.init();
       return;
     }
+    // Применяем новый масштаб при смене пропа: без этого pdfScaleValue,
+    // переданный после маунта (ресайз контейнера или зум), игнорируется.
+    // handleScaleValue масштабирует сразу, debouncedScaleValue добивает
+    // перерисовку слоя выделений после оседания — иначе при зуме (события
+    // resize нет, и оно не триггерит этот пересчёт) выделение не пересчитывается
+    // под новый масштаб и уезжает.
+    if (prevProps.pdfScaleValue !== this.props.pdfScaleValue) {
+      this.handleScaleValue();
+      this.debouncedScaleValue();
+    }
     if (prevProps.highlights !== this.props.highlights) {
       this.renderHighlightLayers();
     }
@@ -556,7 +566,14 @@ export class PdfHighlighter<T_HT extends IHighlight> extends PureComponent<
     }
   };
 
-  debouncedScaleValue: () => void = debounce(this.handleScaleValue, 500);
+  // После оседания масштаба/ресайза принудительно перерисовываем слой выделений:
+  // если масштаб уже был выставлен во время перетаскивания, pdf.js может не
+  // ре-рендерить страницу и событие textlayerrendered не сработает — тогда слой
+  // остаётся со старыми координатами и выделения уезжают.
+  debouncedScaleValue: () => void = debounce(() => {
+    this.handleScaleValue();
+    this.renderHighlightLayers();
+  }, 500);
 
   render() {
     const { onSelectionFinished, enableAreaSelection } = this.props;

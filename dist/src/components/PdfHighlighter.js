@@ -238,7 +238,14 @@ class PdfHighlighter extends PureComponent {
         this.viewer.currentScaleValue = this.props.pdfScaleValue;
       }
     });
-    __publicField(this, "debouncedScaleValue", r(this.handleScaleValue, 500));
+    // После оседания масштаба/ресайза принудительно перерисовываем слой выделений:
+    // если масштаб уже был выставлен во время перетаскивания, pdf.js может не
+    // ре-рендерить страницу и событие textlayerrendered не сработает — тогда слой
+    // остаётся со старыми координатами и выделения уезжают.
+    __publicField(this, "debouncedScaleValue", r(() => {
+      this.handleScaleValue();
+      this.renderHighlightLayers();
+    }, 500));
     if (typeof ResizeObserver !== "undefined") {
       this.resizeObserver = new ResizeObserver(this.debouncedScaleValue);
     }
@@ -251,6 +258,10 @@ class PdfHighlighter extends PureComponent {
     if (prevProps.pdfDocument !== this.props.pdfDocument) {
       this.init();
       return;
+    }
+    if (prevProps.pdfScaleValue !== this.props.pdfScaleValue) {
+      this.handleScaleValue();
+      this.debouncedScaleValue();
     }
     if (prevProps.highlights !== this.props.highlights) {
       this.renderHighlightLayers();
